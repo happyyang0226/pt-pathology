@@ -144,14 +144,14 @@
   }
 
   // ── 해설 (학습의 핵심) ─────────────────────
-  function fbHTML(q, chosen, conf) {
+  function fbHTML(q, chosen, conf, noKey) {
     const c = CMAP[q.c] || {}, so = sortOpts(q), ok = chosen === q.a;
     const vd = ok ? (conf === 'sure' || conf === 'exam' ? '<b>✔ 정답</b>' : `<b>✔ 정답</b> — 하지만 “${CONF[conf]}”였어요. 보기 분석을 꼭 읽어 보세요. 내일 비슷한 문제가 다시 나옵니다.`)
       : `<b>✖ 오답</b> — 정답은 ${NUM[so.indexOf(q.a)]} ${esc(q.a)}${conf === 'sure' ? ' · <span class="warn">확실하다고 생각했던 문제 — 가장 중요한 복습 대상입니다</span>' : ''}`;
     return `<div class="verdict ${ok ? 'ok' : 'bad'}">${vd}</div>
       <div class="fbsec why"><h4>정답 근거</h4><p><b>${esc(q.a)}</b> — ${esc(q.ox[q.a])}</p><p>${esc(q.why)}</p></div>
       <div class="fbsec"><h4>보기 분석 <span class="muted small">— 오답 보기도 하나의 개념입니다</span></h4><ul class="oxl">${so.map((o, j) => `<li class="${o === q.a ? 'ans' : ''} ${o === chosen && !ok ? 'mine' : ''}"><span class="on">${NUM[j]}</span><div><b>${esc(o)}</b>${o === q.a ? ' <span class="tg ok">정답</span>' : ''}${o === chosen && !ok ? ' <span class="tg bad">내 답</span>' : ''}<p>${esc(q.ox[o])}</p></div></li>`).join('')}</ul></div>
-      <details class="fbsec key" open><summary>핵심 정리 · ${esc(c.t || '')}</summary><div class="ksum">${c.sum || ''}</div></details>
+      ${noKey ? '' : `<details class="fbsec key" open><summary>핵심 정리 · ${esc(c.t || '')}</summary><div class="ksum">${c.sum || ''}</div></details>`}
       <div class="fbgrid"><div class="fbsec mem"><h4>기억법</h4><p>${esc(c.mem || '')}</p></div><div class="fbsec clin"><h4>임상 연결</h4><p>${esc(q.clinic || c.clinic || '')}</p></div></div>`;
   }
 
@@ -205,8 +205,110 @@
         ${errs.length ? `<p class="small">틀린 이유: ${errs.map(([k, v]) => `${ERR[k]} ${v}`).join(' · ')}</p><p class="small muted">${esc(ERR_TIP[errs.sort((a, b) => b[1] - a[1])[0][0]])}</p>` : ''}
         <div class="row wrap" style="justify-content:center;gap:8px">${weakC.length ? '<button class="btn" id="again">약한 개념 — 다른 문제로 다시</button>' : ''}<a class="btn ghost" href="${back}">돌아가기</a></div>
         <p class="muted small">틀리거나 애매한 개념은 1일 뒤 <a href="#/review">복습</a>에 다른 문항으로 다시 나옵니다.</p></section>
+      ${deepCTA(res)}
+      <h3 class="oh">문항별 해설 다시 보기</h3>
       ${res.map((r, i) => { const q = QMAP[r.qid]; return `<details class="card rv ${r.ok ? 'ok' : 'bad'}"><summary><span class="qn">${i + 1}</span> ${r.ok ? '✔' : '✖'} ${esc(q.q)} <span class="muted small">${CONF[r.conf] || ''}${r.err ? ' · ' + ERR[r.err] : ''}</span></summary>${fbHTML(q, r.chosen, r.conf)}</details>`; }).join('')}`;
     const ag = $('#again'); if (ag) ag.onclick = () => startStudy(weakC.map(cid => pickVariant(cid, (res.find(r => r.c === cid) || {}).qid)), '약한 개념 다시 풀기', back);
+    bindDeepCTA(res, back);
+    window.scrollTo(0, 0);
+  }
+
+
+  // ── 심화학습 (문제를 다 푼 뒤) ─────────────
+  /* 개념마다 ① 다시 정리하기 → ② 내가 놓친 부분(내 답 vs 정답) → ③ 스스로 설명하기(모범 설명과 비교)
+     → ④ 확인 문제(같은 개념의 다른 문항) → 다음 개념. 마지막에 심화학습 결과. */
+  const explKey = () => 'ptpa_expl_' + (STU ? STU.student_no : 'guest');
+  function myExpl(cid) {
+    const l = (lsGet(explKey(), {})[cid] || []).slice(-2);
+    return l.length ? `<div class="fbsec myx"><h4>내가 쓴 설명</h4>${l.map(x => `<p>“${esc(x.text)}” <span class="muted small">${new Date(x.t).toLocaleDateString('ko-KR')}</span></p>`).join('')}</div>` : '';
+  }
+  function weakOf(res) { return [...new Set(res.filter(r => !r.ok || r.conf === 'unsure' || r.conf === 'guess').map(r => r.c))]; }
+  function deepCTA(res) {
+    const weak = weakOf(res), all = [...new Set(res.map(r => r.c))];
+    if (!all.length) return '';
+    return weak.length
+      ? `<section class="card deepcta"><div><h3>심화학습 — 약한 개념 ${weak.length}개</h3><p class="small">개념마다 <b>① 다시 정리 → ② 내가 놓친 부분 → ③ 스스로 설명하기 → ④ 다른 문제로 확인</b> 순서로 진행합니다. 한 개념에 3~5분이면 됩니다.</p>
+          <div class="chips">${weak.map(cid => `<span class="chip due">${esc(CMAP[cid].t)}</span>`).join('')}</div></div><button class="btn lg" id="deepGo">심화학습 시작 →</button></section>`
+      : `<section class="card deepcta ok"><div><h3>모두 확실하게 맞혔습니다 👏</h3><p class="small">이번에 푼 개념 ${all.length}개를 <b>스스로 설명하기와 다른 문제</b>로 한 번 더 다져 보세요.</p></div><button class="btn ghost lg" id="deepGo">도전 심화학습 →</button></section>`;
+  }
+  function bindDeepCTA(res, back) {
+    const b = $('#deepGo'); if (!b) return;
+    const weak = weakOf(res); b.onclick = () => deepStudy(weak.length ? weak : [...new Set(res.map(r => r.c))], res, back, weak.length ? '심화학습' : '도전 심화학습');
+  }
+  let D = null;
+  function deepStudy(cids, res, back, title) {
+    D = { cids, res, back, title, i: 0, out: [], used: new Set(res.map(r => r.qid)) }; showDeep();
+  }
+  function variantFor(cid) {
+    const qs = Object.values(QMAP).filter(q => q.c === cid), fresh = qs.filter(q => !D.used.has(q.id));
+    const q = fresh.length ? shuffle(fresh)[0] : pickVariant(cid, (D.res.find(r => r.c === cid) || {}).qid);
+    D.used.add(q.id); return q;
+  }
+  function showDeep() {
+    const cid = D.cids[D.i], c = CMAP[cid], mine = D.res.filter(r => r.c === cid);
+    const neg = q => /않은|아닌|거리가 먼/.test(q.q), cq = Object.values(QMAP).filter(q => q.c === cid), mq = mine.map(r => QMAP[r.qid]);
+    const base = mq.find(q => !neg(q) && mine.some(r => r.qid === q.id && !r.ok)) || mq.find(q => !neg(q)) || cq.find(q => !neg(q)) || mq[0] || cq[0];
+    const steps = ['다시 정리', '놓친 부분', '스스로 설명', '확인 문제'];
+    app.innerHTML = `<div class="shead"><a href="${D.back}" class="muted small">← 나가기</a><b>${esc(D.title)} · ${D.i + 1} / ${D.cids.length}</b><span class="muted small">${esc(c.t)}</span></div>
+      <div class="pbar"><i style="width:${100 * D.i / D.cids.length}%"></i></div>
+      <ol class="dsteps">${steps.map((t, k) => `<li data-k="${k}" class="${k === 0 ? 'on' : ''}"><span>${k + 1}</span>${t}</li>`).join('')}</ol>
+      <section class="card dstep" id="d1"><h3><span class="sn">1</span> 다시 정리하기 — ${esc(c.t)}</h3><div class="ksum">${c.sum}</div>
+        <div class="fbgrid"><div class="fbsec mem"><h4>기억법</h4><p>${esc(c.mem)}</p></div><div class="fbsec clin"><h4>임상에서는</h4><p>${esc(c.clinic)}</p></div></div>
+        ${myExpl(cid)}<div class="row end"><button class="btn" data-go="2">다 읽었어요 →</button></div></section>
+      <section class="card dstep" id="d2" hidden><h3><span class="sn">2</span> 내가 놓친 부분</h3>
+        ${mine.length ? mine.map(r => { const q = QMAP[r.qid]; return `<div class="miss"><p class="qq">${esc(q.q)}</p>
+          ${r.ok ? `<p class="small"><span class="tg ok">정답</span> 맞혔지만 <b>${CONF[r.conf] || ''}</b>였습니다. 왜 맞는지 확인하세요.</p>`
+                 : `<div class="vs"><div class="mineb"><small>내가 고른 답</small><b>${esc(r.chosen || '무응답')}</b><p>${esc(r.chosen ? q.ox[r.chosen] : '답을 고르지 않았습니다.')}</p></div><div class="ansb"><small>정답</small><b>${esc(q.a)}</b><p>${esc(q.ox[q.a])}</p></div></div>`}
+          <p class="small"><b>핵심:</b> ${esc(q.why)}</p></div>`; }).join('') : '<p class="muted">이번 풀이 기록이 없는 개념입니다. 1단계 정리를 바탕으로 다음 단계로 가세요.</p>'}
+        <div class="fbsec"><h4>헷갈리기 쉬운 보기 한눈에</h4><ul class="oxl">${base.opts.filter(o => o !== base.a).map(o => `<li><div><b>${esc(o)}</b><p>${esc(base.ox[o])}</p></div></li>`).join('')}</ul></div>
+        <div class="row end"><button class="btn" data-go="3">이해했어요 →</button></div></section>
+      <section class="card dstep" id="d3" hidden><h3><span class="sn">3</span> 스스로 설명하기</h3>
+        <p>보지 않고 <b>친구에게 설명하듯</b> 한두 문장으로 써 보세요. 쓰는 과정에서 기억이 단단해집니다.</p>
+        <p class="qq">“${esc(base.q)}”의 답이 <b>${esc(base.a)}</b>인 이유는?</p>
+        <textarea id="ex" rows="3" placeholder="예) ○○ 때문에 □□이 생기므로 …"></textarea>
+        <div class="row end"><span class="small muted" id="exn">10자 이상 써야 비교할 수 있어요</span><button class="btn" id="exBtn" disabled>모범 설명과 비교하기</button></div>
+        <div id="exCmp" hidden><div class="vs"><div class="mineb"><small>내 설명</small><p id="exMine"></p></div><div class="ansb"><small>모범 설명</small><p>${esc(base.ox[base.a])} ${esc(base.why)}</p></div></div>
+          <p class="small">내 설명에 <b>핵심 단어</b>가 들어 있나요?</p><div class="cbtns" id="exSelf"><button data-v="2">거의 같게 썼다</button><button data-v="1">일부 빠졌다</button><button data-v="0">다르게 썼다</button></div><p class="small muted" id="exTip"></p></div></section>
+      <section class="card dstep" id="d4" hidden><h3><span class="sn">4</span> 확인 문제 <span class="muted small">— 같은 개념, 다른 문제</span></h3><div id="vq"></div></section>`;
+    const show = k => { $(`#d${k}`).hidden = false; $$('.dsteps li').forEach(li => li.classList.toggle('on', +li.dataset.k < k)); $(`#d${k}`).scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $$('[data-go]').forEach(b => b.onclick = () => { b.closest('.row').remove(); show(+b.dataset.go); });
+    const ex = $('#ex'); ex.oninput = () => { const n = ex.value.trim().length; $('#exBtn').disabled = n < 10; $('#exn').textContent = n < 10 ? `10자 이상 써야 비교할 수 있어요 (${n})` : '좋아요'; };
+    $('#exBtn').onclick = () => {
+      const text = ex.value.trim(), all = lsGet(explKey(), {}); (all[cid] = all[cid] || []).push({ text, qid: base.id, t: new Date().toISOString() }); lsSet(explKey(), all);
+      $('#exMine').textContent = text; ex.disabled = true; $('#exBtn').closest('.row').remove(); $('#exCmp').hidden = false;
+    };
+    $$('#exSelf button').forEach(b => b.onclick = () => {
+      $$('#exSelf button').forEach(x => x.classList.toggle('sel', x === b)); const v = +b.dataset.v;
+      $('#exTip').textContent = v === 2 ? '훌륭합니다. 이제 다른 문제로 확인해 봅시다.' : v === 1 ? '빠진 단어를 모범 설명에서 찾아 한 번 소리 내어 말해 보세요.' : '1단계 표를 다시 보고, 모범 설명을 그대로 한 번 따라 써 보세요.';
+      if ($('#d4').hidden) { show(4); deepQuiz(cid); }
+    });
+    window.scrollTo(0, 0);
+  }
+  function deepQuiz(cid) {
+    const q = variantFor(cid), so = sortOpts(q), box = $('#vq'), last = D.i === D.cids.length - 1;
+    box.innerHTML = `<div class="qtop"><span class="qt">${esc(q.type)}</span></div><p class="qq">${esc(q.q)}</p><div class="opts">${so.map((o, j) => `<button class="opt" data-v="${esc(o)}"><span class="on">${NUM[j]}</span><span>${esc(o)}</span></button>`).join('')}</div>
+      <div class="conf" hidden><p>얼마나 확신하나요? <span class="muted small">누르면 채점됩니다</span></p><div class="cbtns"><button data-c="sure">확실해요</button><button data-c="unsure">애매해요</button><button data-c="guess">찍었어요</button></div></div><div class="dfb"></div>`;
+    let pick = null; const t0 = Date.now();
+    $$('.opt', box).forEach(b => b.onclick = () => { if (b.disabled) return; pick = b.dataset.v; $$('.opt', box).forEach(x => x.classList.toggle('sel', x === b)); $('.conf', box).hidden = false; });
+    $$('.conf button', box).forEach(b => b.onclick = () => {
+      const conf = b.dataset.c, ok = pick === q.a, att = { qid: q.id, ch: q.ch, c: q.c, chosen: pick, ok, conf, err: null, mode: 'study', ms: Date.now() - t0, t: new Date().toISOString() };
+      $$('.opt', box).forEach(x => { x.disabled = true; x.classList.toggle('ans', x.dataset.v === q.a); x.classList.toggle('mine', x.dataset.v === pick && !ok); });
+      $('.conf', box).hidden = true;
+      $('.dfb', box).innerHTML = fbHTML(q, pick, conf, true) + `<div class="next">${ok ? '' : `<div class="errq"><p><b>왜 틀렸나요?</b></p><div class="cbtns">${Object.entries(ERR).map(([k, t]) => `<button data-e="${k}">${t}</button>`).join('')}</div></div>`}<button class="btn lg" id="dnx" ${ok ? '' : 'disabled'}>${last ? '심화학습 결과 보기' : '다음 개념 →'}</button></div>`;
+      $$('.errq button', box).forEach(e => e.onclick = () => { att.err = e.dataset.e; $$('.errq button', box).forEach(x => x.classList.toggle('sel', x === e)); $('#dnx').disabled = false; });
+      $('#dnx').onclick = async () => { D.out.push(att); await record([att]); renderNav(); if (last) deepDone(); else { D.i++; showDeep(); } };
+      $('.dfb', box).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  function deepDone() {
+    const okN = D.out.filter(a => a.ok && a.conf === 'sure').length, still = D.out.filter(a => !(a.ok && a.conf === 'sure'));
+    app.innerHTML = `<div class="shead"><a href="${D.back}" class="muted small">← 돌아가기</a><b>${esc(D.title)} — 결과</b><span></span></div>
+      <section class="card center"><div class="score">${okN} / ${D.out.length}</div><p class="muted">확인 문제를 확실하게 맞힌 개념</p>
+        <table class="tbl" style="max-width:560px;margin:10px auto;text-align:left"><tr><th>개념</th><th>확인 문제</th><th>다음 복습</th></tr>
+        ${D.out.map(a => { const s = conceptStates()[a.c]; return `<tr><td>${esc(CMAP[a.c].t)}</td><td>${a.ok ? '✔' : '✖'} ${CONF[a.conf]}</td><td class="small">${statusOf(s).t}</td></tr>`; }).join('')}</table>
+        ${still.length ? `<p class="small">아직 흔들리는 개념 ${still.length}개는 내일 <a href="#/review">복습</a>에 다시 나옵니다.</p>` : '<p class="small">모두 확실히 맞혔습니다. 3일 뒤 복습에서 한 번 더 확인합니다.</p>'}
+        <div class="row wrap" style="justify-content:center;gap:8px">${still.length ? '<button class="btn" id="dAgain">흔들리는 개념만 한 번 더</button>' : ''}<a class="btn ghost" href="${D.back}">돌아가기</a></div></section>`;
+    const a = $('#dAgain'); if (a) a.onclick = () => deepStudy([...new Set(still.map(x => x.c))], still, D.back, '심화학습 (2회차)');
     window.scrollTo(0, 0);
   }
 
@@ -250,6 +352,7 @@
       <p class="muted">문제의 해설에 나오는 “핵심 정리”를 개념별로 모았습니다. 읽은 뒤 바로 그 개념 문제를 풀어 보세요.</p>
       ${ch.objectives.map((o, i) => `<h3 class="oh"><span class="ob">목표 ${i + 1}</span> ${esc(o)}</h3>${ch.concepts.filter(c => c.obj === i + 1).map(c => `<section class="card note"><h3>${esc(c.t)}</h3><div class="ksum">${c.sum}</div>
         <div class="fbgrid"><div class="fbsec mem"><h4>기억법</h4><p>${esc(c.mem)}</p></div><div class="fbsec clin"><h4>임상 연결</h4><p>${esc(c.clinic)}</p></div></div>
+        ${myExpl(c.id)}
         <a class="btn ghost sm" href="#/study/${no}/c-${c.id}">이 개념 문제 풀기 (${ch.questions.filter(q => q.c === c.id).length})</a></section>`).join('')}`).join('')}`;
   }
 
@@ -257,9 +360,10 @@
   function wrong() {
     const lt = latest(), list = Object.values(lt).filter(a => QMAP[a.qid] && (!a.ok || a.conf === 'unsure' || a.conf === 'guess')).sort((a, b) => QMAP[a.qid].id.localeCompare(QMAP[b.qid].id, 'en', { numeric: true }));
     app.innerHTML = `<h1 class="ptitle2">오답 노트</h1><p class="muted">가장 최근에 <b>틀렸거나 확신 없이 맞힌</b> 문제입니다. 해설을 펼쳐 읽고, 다른 문제로 다시 확인하세요.</p>
-      ${list.length ? `<div class="row wrap" style="gap:8px;margin-bottom:12px"><button class="btn" id="redo">같은 개념 다른 문제로 다시 (${new Set(list.map(a => a.c)).size}개념)</button><button class="btn ghost" id="redoSame">이 문제 그대로 다시 (${list.length})</button></div>` : '<section class="card center"><p class="muted">아직 오답이 없습니다.</p></section>'}
+      ${list.length ? `<div class="row wrap" style="gap:8px;margin-bottom:12px"><button class="btn" id="deepW">심화학습 (${new Set(list.map(a => a.c)).size}개념)</button><button class="btn ghost" id="redo">같은 개념 다른 문제로 다시 (${new Set(list.map(a => a.c)).size}개념)</button><button class="btn ghost" id="redoSame">이 문제 그대로 다시 (${list.length})</button></div>` : '<section class="card center"><p class="muted">아직 오답이 없습니다.</p></section>'}
       ${list.map(a => { const q = QMAP[a.qid]; return `<details class="card rv ${a.ok ? 'ok' : 'bad'}"><summary>${a.ok ? '△' : '✖'} <span class="muted small">Ch${q.ch} · ${esc(CMAP[q.c].t)}</span><br>${esc(q.q)} <span class="muted small">— 내 답: ${esc(a.chosen || '무응답')} · ${CONF[a.conf] || ''}${a.err ? ' · ' + ERR[a.err] : ''}</span></summary>${fbHTML(q, a.chosen, a.conf)}</details>`; }).join('')}`;
     const r = $('#redo'); if (r) r.onclick = () => startStudy([...new Set(list.map(a => a.c))].map(cid => pickVariant(cid, (list.find(a => a.c === cid) || {}).qid)), '오답 노트 — 다른 문제로', '#/wrong');
+    const dw = $('#deepW'); if (dw) dw.onclick = () => deepStudy([...new Set(list.map(a => a.c))], list, '#/wrong', '오답 노트 심화학습');
     const r2 = $('#redoSame'); if (r2) r2.onclick = () => startStudy(list.map(a => QMAP[a.qid]), '오답 노트 — 같은 문제', '#/wrong');
   }
 

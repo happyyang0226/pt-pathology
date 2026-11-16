@@ -91,3 +91,20 @@ details.rv[open]>summary{margin-bottom:12px}
   .card{padding:16px}
   .stats3 b{font-size:1.15rem}
 }
+/* 심화학습 */
+.deepcta{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-left:5px solid var(--acc);background:var(--acc2)}
+.deepcta>div{flex:1;min-width:240px} .deepcta h3{margin:0 0 4px;color:var(--acc)} .deepcta p{margin:.2em 0 .5em}
+.deepcta.ok{border-left-color:var(--good);background:var(--good2)} .deepcta.ok h3{color:var(--good)}
+.dsteps{display:flex;gap:6px;list-style:none;padding:0;margin:0 0 14px;flex-wrap:wrap}
+.dsteps li{flex:1;min-width:110px;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:10px;background:#ece9e2;color:var(--mute);font-weight:700;font-size:.88rem}
+.dsteps li span,.sn{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:var(--mute);font-size:.8rem;font-weight:800}
+.dsteps li.on{background:var(--acc);color:#fff} .dsteps li.on span{color:var(--acc)}
+.dstep h3{display:flex;align-items:center;gap:8px;color:var(--acc)} .sn{background:var(--acc);color:#fff}
+.miss{border-top:1px solid var(--line);padding-top:10px;margin-top:10px} .miss:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+.vs>div{border-radius:12px;padding:10px 14px} .vs small{display:block;font-weight:800;margin-bottom:2px} .vs p{margin:.3em 0 0;font-size:.93rem}
+.vs .mineb{background:var(--bad2)} .vs .mineb small{color:var(--bad)} .vs .ansb{background:var(--good2)} .vs .ansb small{color:var(--good)}
+.dstep textarea{width:100%;font:inherit;padding:10px 12px;border:1.5px solid var(--line);border-radius:11px;resize:vertical;margin:6px 0}
+.dstep textarea:focus{outline:none;border-color:var(--acc)}
+.fbsec.myx{background:#f3f0fa;border-color:#d9d0ee} .fbsec.myx h4{color:#5b3fa0}
+@media (max-width:640px){.vs{grid-template-columns:1fr}.dsteps li{min-width:0;font-size:.78rem;padding:6px}}
