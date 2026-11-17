@@ -11,6 +11,9 @@
   const ERR = { unknown: '모르는 내용', confused: '헷갈림', misread: '잘못 읽음' };
   const ERR_TIP = { unknown: '핵심 정리를 먼저 읽고 문제를 다시 풀어 보세요.', confused: '비교표에서 두 개념의 차이 한 줄을 스스로 말해 보세요.', misread: '“옳지 않은 것” · “가장 적절한 것” 같은 끝말을 표시하며 읽어 보세요.' };
   const sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { storageKey: 'ptpa-prof-auth', persistSession: true, autoRefreshToken: true } });
+  // 교수 통합 로그인: 학습 포털에서 넘어온 한 번 쓰는 로그인 표(#sso=…)
+  const SSO = (location.hash.match(/^#sso=([A-Za-z0-9_-]+)/) || [])[1];
+  const ssoReady = SSO ? (history.replaceState(null, '', location.pathname + location.search + '#/'), sb.auth.verifyOtp({ token_hash: SSO, type: 'magiclink' }).then(({ error }) => { if (error) console.warn('SSO', error.message); }).catch(() => { })) : Promise.resolve();
   const app = $('#app');
 
   // ── 데이터 ───────────────────────────────
@@ -427,5 +430,5 @@
     } catch (e) { console.error(e); app.innerHTML = `<div class="card"><p class="bad">${esc(errMsg(e))}</p></div>`; }
   }
   window.addEventListener('hashchange', route);
-  Promise.all([sb.auth.getSession(), loadAtt()]).then(([{ data }]) => { PROF = data.session; route(); });
+  ssoReady.then(() => Promise.all([sb.auth.getSession(), loadAtt()]).then(([{ data }]) => { PROF = data.session; route(); }));
 })();
