@@ -137,7 +137,7 @@
         ${unseen && unseen < s.total ? `<a class="btn ghost" href="#/study/${no}/new">안 푼 문제 (${unseen})</a>` : ''}
         ${weak ? `<a class="btn ghost" href="#/study/${no}/weak">틀린 · 애매한 문제 (${weak})</a>` : ''}
         ${s.due ? `<a class="btn warnbtn" href="#/review/${no}">복습할 개념 (${s.due})</a>` : ''}
-        <a class="btn ghost" href="#/exam/${no}">모의고사 ${Math.min(20, s.total)}문항</a><a class="btn ghost" href="#/notes/${no}">핵심 정리 노트</a></section>
+        <a class="btn ghost" href="#/exam/${no}">모의고사 ${Math.min(20, s.total)}문항</a><a class="btn ghost" href="#/notes/${no}" title="필기·메모·용어 찾기를 쓸 수 있습니다">핵심 정리 노트 ✍</a></section>
       <section class="card"><h3>학습 목표</h3><ol class="objs">${ch.objectives.map((o, i) => {
         const cs = ch.concepts.filter(c => c.obj === i + 1), lv = cs.reduce((t, c) => t + (st[c.id] ? st[c.id].level : 0), 0), pct = cs.length ? Math.round(100 * lv / (cs.length * 3)) : 0, nq = ch.questions.filter(q => q.obj === i + 1).length;
         return `<li><div class="ot"><span class="ob">목표 ${i + 1}</span> ${esc(o)}</div><div class="orow"><div class="bar"><i style="width:${pct}%"></i></div><a class="btn ghost sm" href="#/study/${no}/obj${i + 1}">${nq}문항 풀기</a></div>
@@ -351,9 +351,9 @@
   // ── 핵심 정리 노트 ─────────────────────────
   function notes(no) {
     const ch = PA.ch[no]; if (!ch) return notFound();
-    app.innerHTML = `<div class="shead"><a href="#/ch/${no}" class="muted small">← Chapter ${no}</a><b>핵심 정리 노트</b><span></span></div>
+    app.innerHTML = `<div class="shead"><a href="#/ch/${no}" class="muted small">← Chapter ${no}</a><b>핵심 정리 노트</b><div class="st-tools"></div></div>
       <p class="muted">문제의 해설에 나오는 “핵심 정리”를 개념별로 모았습니다. 읽은 뒤 바로 그 개념 문제를 풀어 보세요.</p>
-      ${ch.objectives.map((o, i) => `<h3 class="oh"><span class="ob">목표 ${i + 1}</span> ${esc(o)}</h3>${ch.concepts.filter(c => c.obj === i + 1).map(c => `<section class="card note"><h3>${esc(c.t)}</h3><div class="ksum">${c.sum}</div>
+      ${ch.objectives.map((o, i) => `<h3 class="oh"><span class="ob">목표 ${i + 1}</span> ${esc(o)}</h3>${ch.concepts.filter(c => c.obj === i + 1).map(c => `<section class="card note" id="n-${esc(c.id)}" data-title="${esc(c.t)}"><h3>${esc(c.t)}</h3><div class="ksum">${c.sum}</div>
         <div class="fbgrid"><div class="fbsec mem"><h4>기억법</h4><p>${esc(c.mem)}</p></div><div class="fbsec clin"><h4>임상 연결</h4><p>${esc(c.clinic)}</p></div></div>
         ${myExpl(c.id)}
         <a class="btn ghost sm" href="#/study/${no}/c-${c.id}">이 개념 문제 풀기 (${ch.questions.filter(q => q.c === c.id).length})</a></section>`).join('')}`).join('')}`;
@@ -362,9 +362,9 @@
   // ── 오답 노트 ─────────────────────────────
   function wrong() {
     const lt = latest(), list = Object.values(lt).filter(a => QMAP[a.qid] && (!a.ok || a.conf === 'unsure' || a.conf === 'guess')).sort((a, b) => QMAP[a.qid].id.localeCompare(QMAP[b.qid].id, 'en', { numeric: true }));
-    app.innerHTML = `<h1 class="ptitle2">오답 노트</h1><p class="muted">가장 최근에 <b>틀렸거나 확신 없이 맞힌</b> 문제입니다. 해설을 펼쳐 읽고, 다른 문제로 다시 확인하세요.</p>
+    app.innerHTML = `<div class="ptitle-row"><h1 class="ptitle2">오답 노트</h1><div class="st-tools"></div></div><p class="muted">가장 최근에 <b>틀렸거나 확신 없이 맞힌</b> 문제입니다. 해설을 펼쳐 읽고, 다른 문제로 다시 확인하세요.</p>
       ${list.length ? `<div class="row wrap" style="gap:8px;margin-bottom:12px"><button class="btn" id="deepW">심화학습 (${new Set(list.map(a => a.c)).size}개념)</button><button class="btn ghost" id="redo">같은 개념 다른 문제로 다시 (${new Set(list.map(a => a.c)).size}개념)</button><button class="btn ghost" id="redoSame">이 문제 그대로 다시 (${list.length})</button></div>` : '<section class="card center"><p class="muted">아직 오답이 없습니다.</p></section>'}
-      ${list.map(a => { const q = QMAP[a.qid]; return `<details class="card rv ${a.ok ? 'ok' : 'bad'}"><summary>${a.ok ? '△' : '✖'} <span class="muted small">Ch${q.ch} · ${esc(CMAP[q.c].t)}</span><br>${esc(q.q)} <span class="muted small">— 내 답: ${esc(a.chosen || '무응답')} · ${CONF[a.conf] || ''}${a.err ? ' · ' + ERR[a.err] : ''}</span></summary>${fbHTML(q, a.chosen, a.conf)}</details>`; }).join('')}`;
+      ${list.map(a => { const q = QMAP[a.qid]; return `<details class="card rv ${a.ok ? 'ok' : 'bad'}" id="w-${esc(q.id)}" data-title="${esc(q.id + ' · ' + CMAP[q.c].t)}"><summary>${a.ok ? '△' : '✖'} <span class="muted small">Ch${q.ch} · ${esc(CMAP[q.c].t)}</span><br>${esc(q.q)} <span class="muted small">— 내 답: ${esc(a.chosen || '무응답')} · ${CONF[a.conf] || ''}${a.err ? ' · ' + ERR[a.err] : ''}</span></summary>${fbHTML(q, a.chosen, a.conf)}</details>`; }).join('')}`;
     const r = $('#redo'); if (r) r.onclick = () => startStudy([...new Set(list.map(a => a.c))].map(cid => pickVariant(cid, (list.find(a => a.c === cid) || {}).qid)), '오답 노트 — 다른 문제로', '#/wrong');
     const dw = $('#deepW'); if (dw) dw.onclick = () => deepStudy([...new Set(list.map(a => a.c))], list, '#/wrong', '오답 노트 심화학습');
     const r2 = $('#redoSame'); if (r2) r2.onclick = () => startStudy(list.map(a => QMAP[a.qid]), '오답 노트 — 같은 문제', '#/wrong');
@@ -428,6 +428,33 @@
       else if (p === 'review') review(a); else if (p === 'exam') exam(+a); else if (p === 'notes') notes(+a);
       else if (p === 'wrong') wrong(); else if (p === 'me') me(); else if (p === 'prof') await prof(); else notFound();
     } catch (e) { console.error(e); app.innerHTML = `<div class="card"><p class="bad">${esc(errMsg(e))}</p></div>`; }
+    try { studyMount(p, a); } catch (e) { console.error(e); }
+  }
+
+  // ── 학생 필기 · 용어 찾기 (js/study.js · student-notes 스킬) ──
+  let GL = null, XIDX = null;
+  const glossFor = () => GL || (GL = (window.PA_GLOSSARY || []).map(g => ({ t: g[0], en: g[1], a: [...new Set((g[2] || []).concat((String(g[1] || '').match(/\b[A-Z][A-Z0-9]{1,7}\b/g) || [])))].filter(x => x !== g[0]), d: g[3], ch: g[4] })));
+  const plain = h => { const d = document.createElement('div'); d.innerHTML = String(h || ''); return (d.textContent || '').replace(/\s+/g, ' ').trim(); };
+  function crossIndex() {
+    if (XIDX) return XIDX; XIDX = [];
+    CHS().forEach(ch => ch.concepts.forEach(c => XIDX.push({ ch: ch.no, href: `#/notes/${ch.no}`, t: c.t, txt: plain(c.t + ' ' + (c.sum || '') + ' ' + (c.mem || '') + ' ' + (c.clinic || '')) })));
+    return XIDX;
+  }
+  function crossSearch(terms, no) {
+    const out = [], ts = (terms || []).filter(t => t && t.length >= 2).map(t => t.toLowerCase()); if (!ts.length) return out;
+    crossIndex().forEach(x => { if (x.ch === no) return; const lo = x.txt.toLowerCase(); let p = -1, w = '';
+      ts.forEach(t => { const q = lo.indexOf(t); if (q >= 0 && (p < 0 || q < p)) { p = q; w = t; } });
+      if (p < 0) return; const a = Math.max(0, p - 24), z = Math.min(x.txt.length, p + w.length + 36);
+      out.push({ href: x.href, label: 'Ch' + x.ch, t: x.t, snip: (a > 0 ? '…' : '') + esc(x.txt.slice(a, p)) + '<mark>' + esc(x.txt.slice(p, p + w.length)) + '</mark>' + esc(x.txt.slice(p + w.length, z)) + (z < x.txt.length ? '…' : '') }); });
+    return out;
+  }
+  function studyMount(p, a) {
+    if (!window.PTX_STUDY) return;
+    const cfg = p === 'notes' && PA.ch[+a] ? { app: `pa-notes-${+a}`, slides: '#app section.card.note', title: `병리학 Ch${+a} 핵심 정리 노트`, no: +a }
+      : p === 'wrong' ? { app: 'pa-wrong', slides: '#app details.card.rv', title: '병리학 오답 노트', no: 0 } : null;
+    if (!cfg || !$('#app .st-tools')) return PTX_STUDY.unmount();
+    PTX_STUDY.mount({ app: cfg.app, slides: cfg.slides, activeClass: 'st-none', mount: '#app .st-tools', medical: true, title: cfg.title,
+      glossary: glossFor(), chLabel: n => 'Ch' + n, hereLabel: '이 화면에서 나오는 곳', crossSearch: t => crossSearch(t, cfg.no), parts: { study: true, lookup: true, edit: false } });
   }
   window.addEventListener('hashchange', route);
   ssoReady.then(() => Promise.all([sb.auth.getSession(), loadAtt()]).then(([{ data }]) => { PROF = data.session; route(); }));
